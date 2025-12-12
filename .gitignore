@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual env
+backend/venv/
+
+# Local environment variables
+.env
+*.env
+
+# PDF certificates & generated QR images
+backend/certificates/
+
+# Node.js
+frontend/node_modules/
+frontend/dist/
+
+# Logs
+*.log
+
+# OS trash
+.DS_Store
+Thumbs.db
+
