@@ -43,12 +43,13 @@ def create_student(
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Генерируем пароль
+    generated_password = generate_password()
+
     new_student = User(
         fullname=student.fullname,
         email=student.email,
         phone=student.phone,
-        password_hash=None,
+        password_hash=hash_password(generated_password),
         role="student",
     )
 
@@ -63,6 +64,7 @@ def create_student(
             "email": new_student.email,
             "phone": new_student.phone,
             "role": new_student.role,
-        }
+        },
+        "password": generated_password,
     }
 
