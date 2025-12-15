@@ -60,12 +60,15 @@ class Certificate(Base):
     __tablename__ = "certificates"
 
     id = Column(Integer, primary_key=True, index=True)
-    exam_id = Column(Integer, ForeignKey("exam_results.id"))
-    student_id = Column(Integer, ForeignKey("users.id"))
-    course_id = Column(Integer, ForeignKey("courses.id"))
-    file_path = Column(String, nullable=False)
+    exam_id = Column(Integer, ForeignKey("exam_results.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    serial = Column(String, nullable=False, unique=True)
+    token = Column(String, unique=True, index=True, nullable=False)
+    pdf_path = Column(String, nullable=True)
+    issued_at = Column(DateTime, default=datetime.utcnow)
+    revoked = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    public_token = Column(String, unique=True, index=True)
 class CourseResult(Base):
     __tablename__ = "course_results"
 

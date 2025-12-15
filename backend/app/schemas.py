@@ -76,6 +76,7 @@ class ProgressRead(BaseModel):
 # --- CERTIFICATE ---
 
 class CertificateRead(BaseModel):
+    exam_id: int | None = None
     id: int
     user_id: int
     course_id: int
@@ -86,7 +87,7 @@ class CertificateRead(BaseModel):
     revoked: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CourseResultCreate(BaseModel):
     user_id: int

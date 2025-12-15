@@ -1,41 +1,20 @@
 # app/routers/certificates.py
 import uuid
+from datetime import datetime
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
 
 from .. import models, schemas
 from ..database import get_db
 from ..deps import get_current_user, require_role
 
 router = APIRouter(prefix="/certificates", tags=["certificates"])
-router = APIRouter(prefix="/verify", tags=["verify"])
 
 
 def generate_serial(user_id: int, course_id: int) -> str:
     return f"CERT-{course_id}-{user_id}-{uuid.uuid4().hex[:8].upper()}"
-
-@router.get("/{token}")
-def verify_certificate(token: str, db: Session = Depends(get_db)):
-    cert = db.query(models.Certificate).filter(models.Certificate.public_token == token).first()
-
-    if not cert:
-        return {
-            "valid": False,
-            "message": "Сертификат недействителен или не существует"
-        }
-
-    student = db.query(models.User).filter(models.User.id == cert.student_id).first()
-    course = db.query(models.Course).filter(models.Course.id == cert.course_id).first()
-
-    return {
-        "valid": True,
-        "fullname": student.fullname,
-        "course": course.title,
-        "date": cert.created_at.strftime("%Y-%m-%d"),
-        "pdf_url": f"/{cert.file_path}",
-        "public_token": token
-    }
 
 @router.post("/issue/{user_id}/{course_id}", response_model=schemas.CertificateRead)
 def issue_certificate(
@@ -71,7 +50,7 @@ def issue_certificate(
         .filter(
             models.Certificate.user_id == user_id,
             models.Certificate.course_id == course_id,
-            models.Certificate.revoked == False,
+            models.Certificate.revoked.is_(False),
         )
         .first()
     )
@@ -86,24 +65,13 @@ def issue_certificate(
         course_id=course_id,
         serial=serial,
         token=token,
-        pdf_path=None,  # позже добавим путь к сгенерированному PDF
+        pdf_path=None,
+        issued_at=datetime.utcnow(),
     )
     db.add(cert)
     db.commit()
     db.refresh(cert)
     return cert
-
-
-@router.get("/verify/{token}", response_model=schemas.CertificateRead)
-def verify_certificate(
-    token: str,
-    db: Session = Depends(get_db),
-):
-    cert = db.query(models.Certificate).filter(models.Certificate.token == token).first()
-    if not cert or cert.revoked:
-        raise HTTPException(status_code=404, detail="Certificate not found or revoked")
-    return cert
-
 
 @router.get("/my", response_model=List[schemas.CertificateRead])
 def my_certificates(
@@ -112,7 +80,10 @@ def my_certificates(
 ):
     certs = (
         db.query(models.Certificate)
-        .filter(models.Certificate.user_id == current_user.id)
+        .filter(
+            models.Certificate.user_id == current_user.id,
+            models.Certificate.revoked.is_(False),
+        )
         .all()
     )
     return certs

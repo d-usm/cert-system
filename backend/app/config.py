@@ -1,10 +1,15 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings
+
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Cert System"
-    DATABASE_URL: str = "postgresql+psycopg2://certuser:Cthncbcntvf78%^@localhost:5432/certdb"
-    JWT_SECRET_KEY: str = "super-secret-key-change-me"
+    DATABASE_URL: str = Field("sqlite:///./cert.db", env="DATABASE_URL")
+    JWT_SECRET_KEY: str = Field("change-me", env="JWT_SECRET_KEY")
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    PUBLIC_BASE_URL: str = Field("http://localhost:8000", env="PUBLIC_BASE_URL")
+    CERTIFICATES_DIR: str = Field("certificates", env="CERTIFICATES_DIR")
 
     class Config:
         env_file = ".env"
