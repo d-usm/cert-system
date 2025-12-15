@@ -1,25 +1,24 @@
+import os
+import os
+import secrets
+from datetime import datetime
+
+import qrcode
 from fastapi import APIRouter, Depends, HTTPException
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 from sqlalchemy.orm import Session
+
+from .. import models, schemas
+from ..config import settings
 from ..database import get_db
 from ..deps import require_role
-from .. import models, schemas
-import os
-from reportlab.pdfgen import canvas
-from datetime import datetime
-import qrcode
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
-import secrets
-import os
-from datetime import datetime
-from ..database import get_db
-from .. import models
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 # 1. Получить список экзаменов, ожидающих утверждения
-@router.get("/pending-exams")
+@router.get("/pending-exams", response_model=list[schemas.ExamResultAdmin])
 def get_pending_exams(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin"))
@@ -40,11 +39,11 @@ def get_pending_exams(
 #    return certs
 @router.get("/certificates")
 def list_certificates(db: Session = Depends(get_db), admin=Depends(require_role("admin"))):
-    certs = db.query(models.Certificate).all()
+    certs = db.query(models.Certificate).filter(models.Certificate.revoked.is_(False)).all()
     output = []
 
     for cert in certs:
-        student = db.query(models.User).filter(models.User.id == cert.student_id).first()
+        student = db.query(models.User).filter(models.User.id == cert.user_id).first()
         course = db.query(models.Course).filter(models.Course.id == cert.course_id).first()
 
         output.append({
@@ -52,9 +51,9 @@ def list_certificates(db: Session = Depends(get_db), admin=Depends(require_role(
             "fullname": student.fullname,
             "email": student.email,
             "course": course.title,
-            "date": cert.created_at.strftime("%Y-%m-%d"),
-            "pdf_url": f"/{cert.file_path}",
-            "public_token": cert.public_token
+            "date": (cert.issued_at or cert.created_at).strftime("%Y-%m-%d"),
+            "pdf_url": f"/{cert.pdf_path}" if cert.pdf_path else None,
+            "public_token": cert.token,
         })
 
     return output
@@ -79,6 +78,21 @@ def approve_exam(
     if exam.approved:
         raise HTTPException(400, "Уже утверждено")
 
+    existing_cert = (
+        db.query(models.Certificate)
+        .filter(
+            models.Certificate.exam_id == exam.id,
+            models.Certificate.revoked.is_(False),
+        )
+        .first()
+    )
+    if existing_cert:
+        return {
+            "status": "approved",
+            "public_token": existing_cert.token,
+            "verify_url": f"{settings.PUBLIC_BASE_URL.rstrip('/')}/verify/{existing_cert.token}",
+        }
+
     # отметили как утвержденный
     exam.approved = True
     db.commit()
@@ -87,11 +101,11 @@ def approve_exam(
     public_token = secrets.token_urlsafe(32)
 
     # 2. Папка для сертификатов
-    cert_dir = "certificates"
+    cert_dir = settings.CERTIFICATES_DIR
     os.makedirs(cert_dir, exist_ok=True)
 
     # 3. QR-код
-    verify_url = f"http://172.16.205.71:8000/verify/{public_token}"
+    verify_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/verify/{public_token}"
     qr_img = qrcode.make(verify_url)
     qr_path = f"{cert_dir}/{public_token}_qr.png"
     qr_img.save(qr_path)
@@ -131,10 +145,12 @@ def approve_exam(
     # 8. Сохраняем сертификат в БД
     cert = models.Certificate(
         exam_id=exam.id,
-        student_id=exam.student_id,
+        user_id=exam.student_id,
         course_id=exam.course_id,
-        file_path=file_path,
-        public_token=public_token,
+        pdf_path=file_path,
+        token=public_token,
+        serial=f"CERT-{exam.student_id}-{exam.course_id}-{public_token[:8].upper()}",
+        issued_at=datetime.utcnow(),
     )
     db.add(cert)
     db.commit()
@@ -144,15 +160,3 @@ def approve_exam(
         "public_token": public_token,
         "verify_url": verify_url
     }
-@router.get("/pending-exams", response_model=list[schemas.ExamResultAdmin])
-def get_pending_exams(
-    db: Session = Depends(get_db),
-    user=Depends(require_role("admin"))
-):
-    exams = (
-        db.query(models.ExamResult)
-        .filter(models.ExamResult.approved.is_(None))
-        .all()
-    )
-    return exams
-
