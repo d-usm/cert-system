@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -16,9 +16,11 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str | None = Field(None, env="ADMIN_PASSWORD")
     ADMIN_FULLNAME: str = Field("Администратор", env="ADMIN_FULLNAME")
 
-    class Config:
-        env_file = Path(__file__).resolve().parent.parent / ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parent.parent / ".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
 
 
 settings = Settings()
