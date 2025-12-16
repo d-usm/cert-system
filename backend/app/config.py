@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     PUBLIC_BASE_URL: str = Field("http://localhost:8000", env="PUBLIC_BASE_URL")
     CERTIFICATES_DIR: str = Field("certificates", env="CERTIFICATES_DIR")
+    ADMIN_EMAIL: str | None = Field(None, env="ADMIN_EMAIL")
+    ADMIN_PASSWORD: str | None = Field(None, env="ADMIN_PASSWORD")
+    ADMIN_FULLNAME: str = Field("Администратор", env="ADMIN_FULLNAME")
 
     class Config:
         env_file = Path(__file__).resolve().parent.parent / ".env"

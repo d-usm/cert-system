@@ -16,7 +16,10 @@
 cp backend/.env.example backend/.env
 ```
 
-и при необходимости обновите значения `DATABASE_URL`, `JWT_SECRET_KEY`, `PUBLIC_BASE_URL` и `CERTIFICATES_DIR`.
+и укажите значения `DATABASE_URL`, `JWT_SECRET_KEY`, `PUBLIC_BASE_URL` и `CERTIFICATES_DIR`.
+Чтобы гарантированно войти в админку после развертывания, заполните переменные
+`ADMIN_EMAIL` и `ADMIN_PASSWORD` в `backend/.env` — при старте приложения
+пользователь с таким email будет создан автоматически (если его ещё нет в базе).
 
 2. Установите зависимости и запустите сервер:
 

@@ -5,8 +5,12 @@ from fastapi.openapi.models import APIKey, SecuritySchemeType
 from fastapi.security import HTTPBearer
 from fastapi.staticfiles import StaticFiles
 
+from sqlalchemy.orm import Session
+
 from .config import settings
-from .database import Base, engine
+from .database import Base, engine, SessionLocal
+from . import models
+from .security import hash_password
 from .routers import admin, auth, certificates, courses, exams, operator, results, verify
 Base.metadata.create_all(bind=engine)
 bearer_scheme = HTTPBearer()
@@ -55,3 +59,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def ensure_default_admin():
+    """
+    Создаёт дефолтного админа, если в .env заданы ADMIN_EMAIL/ADMIN_PASSWORD.
+    Это нужно, чтобы после развертывания можно было войти без ручного добавления
+    записи в БД. Если пользователь с таким email уже есть — ничего не делаем.
+    """
+
+    if not settings.ADMIN_EMAIL or not settings.ADMIN_PASSWORD:
+        return
+
+    with SessionLocal() as db:  # type: Session
+        existing = (
+            db.query(models.User)
+            .filter(models.User.email == settings.ADMIN_EMAIL)
+            .first()
+        )
+        if existing:
+            return
+
+        admin_user = models.User(
+            fullname=settings.ADMIN_FULLNAME,
+            email=settings.ADMIN_EMAIL,
+            phone=None,
+            password_hash=hash_password(settings.ADMIN_PASSWORD),
+            role="admin",
+        )
+        db.add(admin_user)
+        db.commit()
+
+
+ensure_default_admin()
